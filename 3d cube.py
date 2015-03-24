@@ -61,12 +61,13 @@ class Camera():
 
 class Screen():
     """ Screen class mostly meant to hold onto specific variables that only apply to the virtual screen that exists only in the mathematics of the render method. """
-    def __init__(self, width, height, distance=10, rot=0, theta=0, phi=0):
+    def __init__(self, width, height, distance=1, rot=0, theta=0, phi=0):
         self.width, self.height = width, height
         self.distance = distance
         self.rot, self.theta, self.phi = rot, theta, phi
 
 class Cubie():
+    """ Individual cube pieces that collectively make up one cube. Contains local coordinates and location, along with it's own local color values. Meant to be a mobile object for the engine to use to manipulate faces. """
     def __init__(self, x, y, z, color_dict):
         self.polygons = Polygons()
         
@@ -127,6 +128,7 @@ class Cubie():
                 pass
 
 class Polygons():
+    """ Class dedicated to holding onto all information for all polygons. Stores information for actual polygons, points, colors, and management for everything between. """
     def __init__(self):
         self.point_list = []
         self.polygon_list = []
@@ -166,6 +168,7 @@ class Polygons():
         return self.polygon_list [polygon_index] [1]
 
 class Point3D:
+    """ Class dedicated to have a single object for each point to contain it's x,y,z information and allow for some basic easy rotations around axises. Will eventually add more, as needed. """
     def __init__(self, x = 0, y = 0, z = 0):
         self.x, self.y, self.z = float(x), float(y), float(z)
     
@@ -213,6 +216,7 @@ class Point3D:
     coords2d = property(get_coords2d)
 
 class Simulation:
+    """ Main engine of the program. """
     def __init__(self, win_width = 640, win_height = 480):
         pygame.init()
         
@@ -221,12 +225,7 @@ class Simulation:
         
         self.clock = pygame.time.Clock()
         
-        self.rotate = True
-        self.angleX = 0
-        self.angleY = 0
-        self.angleZ = 0
-        self.fov = 256
-        self.viewer_distance = 4.0
+        self.cam = Camera( 0,0,-2.5 )
         
         self.draw_points = False
         self.draw_wires = False
@@ -236,9 +235,7 @@ class Simulation:
         self.wire_color = white
         self.background_color = dark_green
         
-        self.cubes = [
-            Cubie(0,0,0,{'top':'white'})
-            ]
+        self.cube = Cubie(0,0,0,{'top':'white', 'front':'green', 'right':'red', 'back':'blue', 'left':'orange', 'bottom':'yellow'})
     
     def run(self):
         """ Main Loop """
@@ -256,51 +253,26 @@ class Simulation:
                         self.draw_wires = not self.draw_wires
                     if event.key == pygame.K_KP9:
                         self.rotate = not self.rotate
-                    if event.key == pygame.K_KP7:
-                        self.angleX = 0
-                        self.angleY = 0
-                        self.angleZ = 0
-                    if event.key == pygame.K_KP6:
-                        self.angleZ += 10
-                    if event.key == pygame.K_KP5:
-                        self.angleY += 10
-                    if event.key == pygame.K_KP4:
-                        self.angleX += 10
-                    if event.key == pygame.K_KP3:
-                        self.angleZ -= 10
-                    if event.key == pygame.K_KP2:
-                        self.angleY -= 10
-                    if event.key == pygame.K_KP1:
-                        self.angleX -= 10
-                    if event.key == pygame.K_o:
-                        self.viewer_distance += .1
-                    if event.key == pygame.K_l:
-                        self.viewer_distance -= .1
-                    if event.key == pygame.K_i:
-                        self.fov += 8
-                    if event.key == pygame.K_k:
-                        self.fov -= 8
             
             self.clock.tick(50)
             self.screen.fill( self.background_color )
             
             # Calculate the average Z values of each face.
-            average_z = self.poly.get_prj_z_list()
+            rendered_points = self.cam.render( self.cube.polygons.point_list )
+            average_z = [ (point_list, color, sum([ rendered_points[point][2] for point in point_list ])/len( point_list ) ) for point_list, color in self.cube.polygons.polygon_list ]
+            
             # Draw the faces using the Painter's algorithm:
             # Distant faces are drawn before the closer ones.
-            for poly_index, z_distance in sorted(average_z, key=itemgetter(1), reverse=True):
-                pointlist = self.poly.get_2d_prj_polygon( poly_index)
+            for point_list, color, z_distance in sorted(average_z, key=itemgetter(2), reverse=True):
+                point_coords = [ ( rendered_points[point][0], rendered_points[point][1] ) for point in point_list ]
+                print point_coords
                 if self.draw_faces:
-                    pygame.draw.polygon(self.screen, self.poly.get_polygon_color(poly_index), pointlist)
+                    pygame.draw.polygon(self.screen, color, point_coords)
                 if self.draw_wires:
-                    pygame.draw.lines(self.screen, self.wire_color, True, pointlist)
+                    pygame.draw.lines(self.screen, self.wire_color, True, point_coords)
                 if self.draw_points:
-                    for x,y in pointlist:
+                    for x,y in point_coords:
                         self.screen.fill( self.point_color, (x, y, 2, 2))
-            if self.rotate:
-                self.angleX += 1
-                self.angleY += 1
-                self.angleZ += 1
             
             pygame.display.flip()
 
