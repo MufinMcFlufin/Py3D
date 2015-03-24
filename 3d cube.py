@@ -1,12 +1,135 @@
 import copy, sys, math, pygame
 from operator import itemgetter
 
+cubie_size = 0.75
+sticker_size = 0.5625
+cubie_faces = [
+    'top',
+    'bottom',
+    'front',
+    'back',
+    'right',
+    'left',
+]
+
+white = (255, 255, 255)
+green = (0, 255, 0)
+red = (255, 0, 0)
+blue = (0, 0, 255)
+orange = (255, 102, 0)
+yellow = (255, 255, 0)
+black = (0, 0, 0)
+dark_green = (0, 32, 0)
+
+color_ref = {
+(255, 255, 255): 'white',
+(0, 255, 0): 'green',
+(255, 0, 0): 'red',
+(0, 0, 255): 'blue',
+(255, 102, 0): 'orange',
+(255, 255, 0): 'yellow',
+(0, 0, 0): 'black',
+(0, 32, 0): 'dark_green',
+white: (255, 255, 255),
+green: (0, 255, 0),
+red: (255, 0, 0),
+blue: (0, 0, 255),
+orange: (255, 102, 0),
+yellow: (255, 255, 0),
+black: (0, 0, 0),
+dark_green: (0, 32, 0),
+}
+
+class Camera():
+    """ Camera class largely meant to handle converting points from real 3d coordinates to applied perspective, but also holds onto all related variables for data cleanliness, and for an easy way to manipulate the camera independent of other variables. """
+    def __init__(self, x, y, z, theta=0, phi=0, width=640, height=320):
+        self.x, self.y, self.z = x, y, z
+        self.theta, self.phi = theta, phi
+        self.screen = Screen( width, height )
+    
+    def render(self, point_list):
+        """ Returns 2d coordinates of applied perspective of point_list, 3rd coordinate of distance to camera for painterly algorithm. """
+        # delta list is difference between x,y,z of points and camera
+        delta_l = [ (point.x - self.x, point.y - self.y, point.z - self.z) for point in point_list]
+        # next, determines difference in angle between point and camera, and distance to camera
+        delta_l = [ (math.atan(float(x)/float(z)), math.atan(float(y)/float(z)), math.sqrt( math.pow(x, 2) + math.pow(y, 2) + math.pow(z, 2))) for x, y, z in delta_l ]
+        # this is the angle from the camera's perspective that it would see the points, and distance to camera
+        perspective_l = [ (theta - self.theta, phi - self.phi, dist) for theta, phi, dist in delta_l ]
+        # final calculations, to find the 2d coordinates of the perspective applied to the points, plus distance
+        screen_l = [ (self.screen.distance * math.tan( theta ) + self.screen.width/2, self.screen.distance * math.tan( phi ) + self.screen.height/2, dist) for theta, phi, dist in perspective_l ]
+        return screen_l
+
+class Screen():
+    """ Screen class mostly meant to hold onto specific variables that only apply to the virtual screen that exists only in the mathematics of the render method. """
+    def __init__(self, width, height, distance=10, rot=0, theta=0, phi=0):
+        self.width, self.height = width, height
+        self.distance = distance
+        self.rot, self.theta, self.phi = rot, theta, phi
+
+class Cubie():
+    def __init__(self, x, y, z, color_dict):
+        self.polygons = Polygons()
+        
+        self.x, self.y, self.z = x, y, z
+        self.theta, self.phi = 0, 0
+        
+        for corner_x in range(2):
+            for corner_y in range(2):
+                for corner_z in range(2):
+                    self.polygons.add_point( Point3D(
+                        corner_x * cubie_size/2 - cubie_size/2,
+                        corner_y * cubie_size/2 - cubie_size/2,
+                        corner_z * cubie_size/2 - cubie_size/2,
+                        ))
+        
+        self.polygons.add_polygons([
+            [(0,1,3,2),(black)],
+            [(0,1,5,4),(black)],
+            [(0,2,6,4),(black)],
+            [(2,3,7,6),(black)],
+            [(1,3,7,5),(black)],
+            [(4,5,7,6),(black)],
+        ])
+        
+        for face in cubie_faces:
+            try:
+                color = color_dict [face]
+                # for loop through all possible faces, and check in color_dict
+                # if returns result, color is added to list of points, and added as a polygon
+                # this is the intended location to return a KeyError for the try/except
+                if face == 'top':
+                    for x in range(-1,2,2):
+                        for z in range(-1,2,2):
+                            self.polygons.add_point( Point3D( x*sticker_size/2, cubie_size/2 + 0.01, z*sticker_size/2 ))
+                elif face == 'bottom':
+                    for x in range(-1,2,2):
+                        for z in range(-1,2,2):
+                            self.polygons.add_point( Point3D( x*sticker_size/2, -cubie_size/2 - 0.01, z*sticker_size/2 ))
+                elif face == 'front':
+                    for x in range(-1,2,2):
+                        for y in range(-1,2,2):
+                            self.polygons.add_point( Point3D( x*sticker_size/2, y*sticker_size/2, cubie_size/2 + 0.01 ))
+                elif face == 'back':
+                    for x in range(-1,2,2):
+                        for y in range(-1,2,2):
+                            self.polygons.add_point( Point3D( x*sticker_size/2, y*sticker_size/2, -cubie_size/2 - 0.01 ))
+                elif face == 'right':
+                    for y in range(-1,2,2):
+                        for z in range(-1,2,2):
+                            self.polygons.add_point( Point3D( cubie_size/2 + 0.01, y*sticker_size/2, z*sticker_size/2 ))
+                elif face == 'left':
+                    for y in range(-1,2,2):
+                        for z in range(-1,2,2):
+                            self.polygons.add_point( Point3D( -cubie_size/2 - 0.01, y*sticker_size/2, z*sticker_size/2 ))
+                points = len( self.polygons.point_list )
+                self.polygons.add_polygon( (points - 4, points - 3, points - 1, points - 2), color_ref [color] )
+            except KeyError:
+                pass
+
 class Polygons():
     def __init__(self):
         self.point_list = []
         self.polygon_list = []
-        self.rotate_list = []
-        self.project_list = []
     
     def add_point(self, point, check = False):
         if check:
@@ -36,83 +159,8 @@ class Polygons():
         for points, color in polygon_list:
             self.add_polygon(points, color, check)
     
-    def get_point(self, point_index):
-        return self.point_list[point_index]
-    
-    def get_point_list(self, point_index_list):
-        return [self.get_point(point_index) for point_index in point_index_list]
-    
-    def get_polygon(self, polygon_index):
-        return self.polygon_list[polygon_index]
-    
     def get_polygon_points(self, polygon_index):
         return self.polygon_list [polygon_index][0]
-    
-    def get_polygon_point_list(self, polygon_index):
-        return [ self.get_point(point_index) for point_index in self.polygon_list [polygon_index][0] ]
-    
-    def rotate_point(self, point_index, angleX, angleY, angleZ):
-        if self.rotate_list == []:
-            self.rotate_list = copy.deepcopy(self.point_list)
-        self.rotate_list [point_index] = self.point_list [point_index].rotateX(angleX).rotateY(angleY).rotateZ(angleZ)
-    
-    def rotate_points(self, point_list, angleX, angleY, angleZ):
-        for point_index in point_list:
-            self.rotate_point(point_index, angleX, angleY, angleZ)
-    
-    def rotate_polygon(self, polygon_index, angleX, angleY, angleZ):
-        self.rotate_points(self.get_polygon_points(polygon_index), angleX, angleY, angleZ)
-    
-    def rotate_polygons(self, polygon_list, angleX, angleY, angleZ):
-        for polygon_index in polygon_list:
-            self.rotate_points(self.get_polygon_points(polygon_index), angleX, angleY, angleZ)
-    
-    def prj_point(self, point_index, screen_width, screen_height, fov, viewer_distance):
-        if prj_list == []:
-            self.project_list = copy.deepcopy(self.point_list)
-        self.project_list [point_index] = self.rotate_list [point_index].project(screen_width(), screen_height(), fov, viewer_distance)
-    
-    def prj_points(self, point_list, screen_width, screen_height, fov, viewer_distance):
-        for point_index in point_list:
-            self.prj_point(point_index, screen_width, screen_height, fov, viewer_distance)
-    
-    def prj_all(self, screen_width, screen_height, fov, viewer_distance):
-        self.project_list = [point.project(screen_width, screen_height, fov, viewer_distance) for point in self.rotate_list]
-    
-    def get_prj_point(self, point_index):
-        return self.project_list [point_index] 
-    
-    def get_prj_points(self, point_list):
-        return [ self.get_prj_point(point_index) for point_index in point_list]
-    
-    
-    def get_prj_point_list(self, point_list):
-        return [ self.get_prj_point(point_index) for point_index in point_list]
-    
-    def get_prj_polygon(self, polygon_index):
-        return self.get_prj_points( self.get_polygon_points( polygon_index))
-    
-    def get_prj_polygons(self, polygon_list):
-        return [ self.get_prj_polygon( polygon_index) for polygon_index in polygon_list]
-    
-    def get_2d_prj_point(self, point_index):
-        return self.project_list [point_index].coords2d
-    
-    def get_2d_prj_points(self, point_list):
-        return [ self.get_2d_prj_point(point_index) for point_index in point_list]
-    
-    def get_2d_prj_polygon(self, polygon_index):
-        return self.get_2d_prj_points( self.get_polygon_points( polygon_index))
-    
-    def get_2d_prj_polygons(self, polygon_list):
-        return [ self.get_2d_prj_polygon( polygon_index) for polygon_index in polygon_list]
-    
-    def get_prj_polygon_z(self, polygon_index):
-        point_list = self.get_prj_polygon( polygon_index)
-        return sum([ point.z for point in point_list]) / len( point_list)
-    
-    def get_prj_z_list(self):
-        return [ (polygon_index, sum([ point.z for point in self.get_prj_point_list(point_list)]) / len( point_list)) for polygon_index, (point_list, color) in enumerate(self.polygon_list)]
     
     def get_polygon_color(self, polygon_index):
         return self.polygon_list [polygon_index] [1]
@@ -171,7 +219,6 @@ class Simulation:
         self.screen = pygame.display.set_mode((win_width, win_height))
         pygame.display.set_caption("Simulation of a rotating 3D Cube")
         
-        self.poly = Polygons()
         self.clock = pygame.time.Clock()
         
         self.rotate = True
@@ -185,41 +232,13 @@ class Simulation:
         self.draw_wires = False
         self.draw_faces = True
         
+        self.point_color = green
+        self.wire_color = white
+        self.background_color = dark_green
         
-        self.color_ref = {
-        (255, 255, 255): 'white',
-        (0, 255, 0): 'green',
-        (255, 0, 0): 'red',
-        (0, 0, 255): 'blue',
-        (255, 102, 0): 'orange',
-        (255, 255, 0): 'yellow',
-        (0, 0, 0): 'black',
-        (0, 32, 0): 'dark_green',
-        }
-        
-        
-        self.white = (255, 255, 255)
-        self.green = (0, 255, 0)
-        self.red = (255, 0, 0)
-        self.blue = (0, 0, 255)
-        self.orange = (255, 102, 0)
-        self.yellow = (255, 255, 0)
-        self.black = (0, 0, 0)
-        self.dark_green = (0, 32, 0)
-        
-        self.point_color = self.green
-        self.wire_color = self.white
-        self.background_color = self.dark_green
-        
-        for line in open( "C:\\Users\\Joey\\Desktop\\Program Scripts\\Python\\Rubik's Programs\\point_data.txt" ):
-            x, y, z = line.split()
-            self.poly.add_point( Point3D( x, y, z))
-        
-        for line in open( "C:\\Users\\Joey\\Desktop\\Program Scripts\\Python\\Rubik's Programs\\polygon_data.txt" ):
-            point_str, color_str = line.split('|')
-            points = [ int(e) for e in point_str.split()]
-            color = [ int(e) for e in color_str.split()]
-            self.poly.add_polygon(points, color)
+        self.cubes = [
+            Cubie(0,0,0,{'top':'white'})
+            ]
     
     def run(self):
         """ Main Loop """
@@ -264,9 +283,6 @@ class Simulation:
             
             self.clock.tick(50)
             self.screen.fill( self.background_color )
-            
-            self.poly.rotate_points( range(len(self.poly.point_list)), self.angleX, self.angleY, self.angleZ)
-            self.poly.prj_all(self.screen.get_width(), self.screen.get_height(), self.fov, self.viewer_distance)
             
             # Calculate the average Z values of each face.
             average_z = self.poly.get_prj_z_list()
