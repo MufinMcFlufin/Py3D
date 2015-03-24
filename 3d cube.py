@@ -1,6 +1,7 @@
 import copy, sys, math, pygame
 from operator import itemgetter
 
+mult = .01
 cubie_size = 0.75
 sticker_size = 0.5625
 cubie_faces = [
@@ -236,9 +237,22 @@ class Simulation:
         self.background_color = dark_green
         
         self.cube = Cubie(0,0,0,{'top':'white', 'front':'green', 'right':'red', 'back':'blue', 'left':'orange', 'bottom':'yellow'})
+        
+        self.poly = Polygons()
+        
+        for line in open( "C:\\Users\\Joey\\Desktop\\Program Scripts\\Python\\Rubik's Programs\\point_data.txt" ):
+            x, y, z = line.split()
+            self.poly.add_point( Point3D( x, y, z))
+        
+        for line in open( "C:\\Users\\Joey\\Desktop\\Program Scripts\\Python\\Rubik's Programs\\polygon_data.txt" ):
+            point_str, color_str = line.split('|')
+            points = [ int(e) for e in point_str.split()]
+            color = [ int(e) for e in color_str.split()]
+            self.poly.add_polygon(points, color)
     
     def run(self):
         """ Main Loop """
+        mult = .01
         while 1:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -253,29 +267,47 @@ class Simulation:
                         self.draw_wires = not self.draw_wires
                     if event.key == pygame.K_KP9:
                         self.rotate = not self.rotate
+                    if event.key == pygame.K_KP4:
+                        self.cam.z += mult
+                    if event.key == pygame.K_KP5:
+                        mult *= 10
+                    if event.key == pygame.K_KP2:
+                        mult /= 10
+                    if event.key == pygame.K_KP1:
+                        self.cam.z -= mult
+            
+            print '\r', self.cam.z,
             
             self.clock.tick(50)
             self.screen.fill( self.background_color )
-            
-            # Calculate the average Z values of each face.
-            rendered_points = self.cam.render( self.cube.polygons.point_list )
-            average_z = [ (point_list, color, sum([ rendered_points[point][2] for point in point_list ])/len( point_list ) ) for point_list, color in self.cube.polygons.polygon_list ]
-            
-            # Draw the faces using the Painter's algorithm:
-            # Distant faces are drawn before the closer ones.
-            for point_list, color, z_distance in sorted(average_z, key=itemgetter(2), reverse=True):
-                point_coords = [ ( rendered_points[point][0], rendered_points[point][1] ) for point in point_list ]
-                print point_coords
-                if self.draw_faces:
-                    pygame.draw.polygon(self.screen, color, point_coords)
-                if self.draw_wires:
-                    pygame.draw.lines(self.screen, self.wire_color, True, point_coords)
-                if self.draw_points:
-                    for x,y in point_coords:
-                        self.screen.fill( self.point_color, (x, y, 2, 2))
+            while True:
+                try:
+                    # Calculate the average Z values of each face.
+                    rendered_points = self.cam.render( self.poly.point_list )
+                    average_z = [ (point_list, color, sum([ rendered_points[point][2] for point in point_list ])/len( point_list ) ) for point_list, color in self.poly.polygon_list ]
+                    
+                    # Draw the faces using the Painter's algorithm:
+                    # Distant faces are drawn before the closer ones.
+                    for point_list, color, z_distance in sorted(average_z, key=itemgetter(2), reverse=True):
+                        point_coords = [ ( rendered_points[point][0], rendered_points[point][1] ) for point in point_list ]
+                        if self.draw_faces:
+                            pygame.draw.polygon(self.screen, color, point_coords)
+                        if self.draw_wires:
+                            pygame.draw.lines(self.screen, self.wire_color, True, point_coords)
+                        if self.draw_points:
+                            for x,y in point_coords:
+                                self.screen.fill( self.point_color, (x, y, 2, 2))
+                    break
+                except TypeError:
+                    self.cam.z += mult
             
             pygame.display.flip()
 
 if __name__ == "__main__":
-    Simulation().run()
+    try:
+        Simulation().run()
+    except:
+        import time, traceback
+        traceback.print_exc()
+        time.sleep(10000)
 
