@@ -43,10 +43,10 @@ dark_green: (0, 32, 0),
 
 class Camera():
     """ Camera class largely meant to handle converting points from real 3d coordinates to applied perspective, but also holds onto all related variables for data cleanliness, and for an easy way to manipulate the camera independent of other variables. """
-    def __init__(self, x, y, z, theta=0, phi=0, width=640, height=320):
+    def __init__(self, x, y, z, theta=0, phi=0, win_width=640, win_height=480):
         self.x, self.y, self.z = x, y, z
         self.theta, self.phi = theta, phi
-        self.screen = Screen( width, height )
+        self.screen = Screen( win_width, win_height )
     
     def render(self, point_list):
         """ Returns 2d coordinates of applied perspective of point_list, 3rd coordinate of distance to camera for painterly algorithm. """
@@ -57,15 +57,19 @@ class Camera():
         # this is the angle from the camera's perspective that it would see the points, and distance to camera
         perspective_l = [ (theta - self.theta, phi - self.phi, dist) for theta, phi, dist in delta_l ]
         # final calculations, to find the 2d coordinates of the perspective applied to the points, plus distance
-        screen_l = [ (self.screen.distance * math.tan( theta ) + self.screen.width/2, self.screen.distance * math.tan( phi ) + self.screen.height/2, dist) for theta, phi, dist in perspective_l ]
+        screen_l = [ (
+            self.screen.win_width * self.screen.distance * math.tan( theta ) / self.screen.width + self.screen.win_width/2,
+            self.screen.win_height * self.screen.distance * math.tan( phi ) / self.screen.height + self.screen.win_height/2,
+            dist
+            ) for theta, phi, dist in perspective_l ]
         return screen_l
 
 class Screen():
     """ Screen class mostly meant to hold onto specific variables that only apply to the virtual screen that exists only in the mathematics of the render method. """
-    def __init__(self, width, height, distance=1, rot=0, theta=0, phi=0):
-        self.width, self.height = width, height
+    def __init__(self, win_width, win_height, distance=2, rot=0, width=4/3.0, height=1):
+        self.win_width, self.win_height = win_width, win_height
         self.distance = distance
-        self.rot, self.theta, self.phi = rot, theta, phi
+        self.width, self.height = width, height
 
 class Cubie():
     """ Individual cube pieces that collectively make up one cube. Contains local coordinates and location, along with it's own local color values. Meant to be a mobile object for the engine to use to manipulate faces. """
@@ -226,7 +230,7 @@ class Simulation:
         
         self.clock = pygame.time.Clock()
         
-        self.cam = Camera( 0,0,-2.5 )
+        self.cam = Camera( 0.0, 0.0, -4.0 )
         
         self.draw_points = False
         self.draw_wires = False
@@ -259,53 +263,68 @@ class Simulation:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_f:
+                    if event.key == pygame.K_1:
                         self.draw_faces = not self.draw_faces
-                    if event.key == pygame.K_p:
+                    if event.key == pygame.K_2:
+                        self.draw_wires = not self.draw_wires
+                    if event.key == pygame.K_3:
                         self.draw_points = not self.draw_points
                     if event.key == pygame.K_w:
-                        self.draw_wires = not self.draw_wires
-                    if event.key == pygame.K_KP9:
-                        self.rotate = not self.rotate
+                        self.cam.phi += mult
+                    if event.key == pygame.K_a:
+                        self.cam.theta -= mult
+                    if event.key == pygame.K_s:
+                        self.cam.phi -= mult
+                    if event.key == pygame.K_d:
+                        self.cam.theta += mult
                     if event.key == pygame.K_KP4:
-                        self.cam.z += mult
-                    if event.key == pygame.K_KP5:
-                        mult *= 10
-                    if event.key == pygame.K_KP2:
-                        mult /= 10
+                        self.cam.x += mult
                     if event.key == pygame.K_KP1:
+                        self.cam.x -= mult
+                    if event.key == pygame.K_KP5:
+                        self.cam.y += mult
+                    if event.key == pygame.K_KP2:
+                        self.cam.y -= mult
+                    if event.key == pygame.K_KP6:
+                        self.cam.z += mult
+                    if event.key == pygame.K_KP3:
                         self.cam.z -= mult
+                    if event.key == pygame.K_KP7:
+                        mult *= 10
+                    if event.key == pygame.K_KP9:
+                        mult /= 10
+                    if event.key == pygame.K_i:
+                        self.cam.screen.distance += mult
+                    if event.key == pygame.K_k:
+                        self.cam.screen.distance -= mult
             
-            print '\r', self.cam.z,
+            print '\r', self.cam.x, self.cam.y, self.cam.z, self.cam.screen.distance,
             
             self.clock.tick(50)
             self.screen.fill( self.background_color )
-            while True:
-                try:
-                    # Calculate the average Z values of each face.
-                    rendered_points = self.cam.render( self.poly.point_list )
-                    average_z = [ (point_list, color, sum([ rendered_points[point][2] for point in point_list ])/len( point_list ) ) for point_list, color in self.poly.polygon_list ]
-                    
-                    # Draw the faces using the Painter's algorithm:
-                    # Distant faces are drawn before the closer ones.
-                    for point_list, color, z_distance in sorted(average_z, key=itemgetter(2), reverse=True):
-                        point_coords = [ ( rendered_points[point][0], rendered_points[point][1] ) for point in point_list ]
-                        if self.draw_faces:
-                            pygame.draw.polygon(self.screen, color, point_coords)
-                        if self.draw_wires:
-                            pygame.draw.lines(self.screen, self.wire_color, True, point_coords)
-                        if self.draw_points:
-                            for x,y in point_coords:
-                                self.screen.fill( self.point_color, (x, y, 2, 2))
-                    break
-                except TypeError:
-                    self.cam.z += mult
+            # Calculate the average Z values of each face.
+            rendered_points = self.cam.render( self.poly.point_list )
+            average_z = [ (point_list, color, sum([ rendered_points[point][2] for point in point_list ])/len( point_list ) ) for point_list, color in self.poly.polygon_list ]
+            
+            # Draw the faces using the Painter's algorithm:
+            # Distant faces are drawn before the closer ones.
+            for point_list, color, z_distance in sorted(average_z, key=itemgetter(2), reverse=True):
+                point_coords = [ ( rendered_points[point][0], rendered_points[point][1] ) for point in point_list ]
+                if self.draw_faces:
+                    pygame.draw.polygon(self.screen, color, point_coords)
+                if self.draw_wires:
+                    pygame.draw.lines(self.screen, self.wire_color, True, point_coords)
+                if self.draw_points:
+                    for x,y in point_coords:
+                        self.screen.fill( self.point_color, (x, y, 2, 2))
             
             pygame.display.flip()
 
 if __name__ == "__main__":
     try:
         Simulation().run()
+    except SystemError:
+        pass
     except:
         import time, traceback
         traceback.print_exc()
