@@ -55,7 +55,7 @@ class Camera():
         # next, determines difference in angle between point and camera, and distance to camera
         delta_l = [ (math.atan(float(x)/float(z)), math.atan(float(y)/float(z)), math.sqrt( math.pow(x, 2) + math.pow(y, 2) + math.pow(z, 2))) for x, y, z in delta_l ]
         # this is the angle from the camera's perspective that it would see the points, and distance to camera
-        perspective_l = [ (theta - self.theta, phi - self.phi, dist) for theta, phi, dist in delta_l ]
+        perspective_l = [ (theta - self.theta, self.phi - phi, dist) for theta, phi, dist in delta_l ]
         # final calculations, to find the 2d coordinates of the perspective applied to the points, plus distance
         screen_l = [ (
             self.screen.win_width * self.screen.distance * math.tan( theta ) / self.screen.width + self.screen.win_width/2,
@@ -230,7 +230,7 @@ class Simulation:
         
         self.clock = pygame.time.Clock()
         
-        self.cam = Camera( 0.0, 0.0, -4.0 )
+        self.cam = Camera( 0.0, 0.0, -9.0, win_width = win_width, win_height = win_height )
         
         self.draw_points = False
         self.draw_wires = False
@@ -240,15 +240,15 @@ class Simulation:
         self.wire_color = white
         self.background_color = dark_green
         
-        self.cube = Cubie(0,0,0,{'top':'white', 'front':'green', 'right':'red', 'back':'blue', 'left':'orange', 'bottom':'yellow'})
+        #self.cube = Cubie(0,0,0,{'top':'white', 'front':'green', 'right':'red', 'back':'blue', 'left':'orange', 'bottom':'yellow'})
         
         self.poly = Polygons()
         
-        for line in open( "C:\\Users\\Joey\\Desktop\\Program Scripts\\Python\\Rubik's Programs\\point_data.txt" ):
+        for line in open( "point_data.txt" ):
             x, y, z = line.split()
             self.poly.add_point( Point3D( x, y, z))
         
-        for line in open( "C:\\Users\\Joey\\Desktop\\Program Scripts\\Python\\Rubik's Programs\\polygon_data.txt" ):
+        for line in open( "polygon_data.txt" ):
             point_str, color_str = line.split('|')
             points = [ int(e) for e in point_str.split()]
             color = [ int(e) for e in color_str.split()]
@@ -323,7 +323,7 @@ class Simulation:
 if __name__ == "__main__":
     try:
         Simulation().run()
-    except SystemError:
+    except SystemExit:
         pass
     except:
         import time, traceback
