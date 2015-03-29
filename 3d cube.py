@@ -302,12 +302,13 @@ class Simulation:
             
             self.clock.tick(50)
             self.screen.fill( self.background_color )
+            
             # Calculate the average Z values of each face.
             rendered_points = self.cam.render( self.poly.point_list )
             average_z = [ (point_list, color, sum([ rendered_points[point][2] for point in point_list ])/len( point_list ) ) for point_list, color in self.poly.polygon_list ]
             
-            # Draw the faces using the Painter's algorithm:
-            # Distant faces are drawn before the closer ones.
+            # Draw the faces using the Painterly algorithm:
+            # Distant faces are drawn before the closer ones, as determined by average Z axis distance from camera
             for point_list, color, z_distance in sorted(average_z, key=itemgetter(2), reverse=True):
                 point_coords = [ ( rendered_points[point][0], rendered_points[point][1] ) for point in point_list ]
                 if self.draw_faces:
