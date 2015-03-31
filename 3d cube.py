@@ -53,9 +53,9 @@ class Camera():
         # delta list is difference between x,y,z of points and camera
         delta_l = [ (point.x - self.x, point.y - self.y, point.z - self.z) for point in point_list]
         # next, determines difference in angle between point and camera, and distance to camera
-        delta_l = [ (math.atan(float(x)/float(z)), math.atan(float(y)/float(z)), math.sqrt( math.pow(x, 2) + math.pow(y, 2) + math.pow(z, 2))) for x, y, z in delta_l ]
+        theta_l = [ (math.atan(float(x)/math.sqrt( math.pow(y,2) + math.pow(z,2))), math.atan(float(y)/math.sqrt( math.pow(x,2) + math.pow(z,2))), math.sqrt( math.pow(x, 2) + math.pow(y, 2) + math.pow(z, 2))) for x, y, z in delta_l ]
         # this is the angle from the camera's perspective that it would see the points, and distance to camera
-        perspective_l = [ (theta - self.theta, self.phi - phi, dist) for theta, phi, dist in delta_l ]
+        perspective_l = [ (theta - self.theta, self.phi - phi, dist) for theta, phi, dist in theta_l ]
         # final calculations, to find the 2d coordinates of the perspective applied to the points, plus distance
         screen_l = [ (
             self.screen.win_width * self.screen.distance * math.tan( theta ) / self.screen.width + self.screen.win_width/2,
@@ -230,7 +230,8 @@ class Simulation:
         
         self.clock = pygame.time.Clock()
         
-        self.cam = Camera( 0.0, 0.0, -9.0, win_width = win_width, win_height = win_height )
+        self.cam = Camera( -3, 0.0, -9.5, win_width = win_width, win_height = win_height )
+        self.cam.theta = 0.1 * math.pi
         
         self.draw_points = False
         self.draw_wires = False
@@ -239,6 +240,9 @@ class Simulation:
         self.point_color = green
         self.wire_color = white
         self.background_color = dark_green
+        
+        self.rotate = 1.4*math.pi
+        self.rotate_inc = math.pi / 20
         
         #self.cube = Cubie(0,0,0,{'top':'white', 'front':'green', 'right':'red', 'back':'blue', 'left':'orange', 'bottom':'yellow'})
         
@@ -269,6 +273,22 @@ class Simulation:
                         self.draw_wires = not self.draw_wires
                     if event.key == pygame.K_3:
                         self.draw_points = not self.draw_points
+                    if event.key == pygame.K_8:
+                        self.rotate_inc *= -1
+                    if event.key == pygame.K_9:
+                        self.rotate -= self.rotate_inc
+                        self.cam.x = 0
+                        self.cam.y = 10*math.cos( self.rotate )
+                        self.cam.z = 10*math.sin( self.rotate )
+                        self.cam.theta = 0
+                        self.cam.phi = 3*math.pi/2 - self.rotate
+                    if event.key == pygame.K_0:
+                        self.rotate -= self.rotate_inc
+                        self.cam.x = 10*math.cos( self.rotate )
+                        self.cam.y = 0
+                        self.cam.z = 10*math.sin( self.rotate )
+                        self.cam.theta = 3*math.pi/2 - self.rotate
+                        self.cam.phi = 0
                     if event.key == pygame.K_w:
                         self.cam.phi += mult
                     if event.key == pygame.K_a:
@@ -298,7 +318,7 @@ class Simulation:
                     if event.key == pygame.K_k:
                         self.cam.screen.distance -= mult
             
-            print '\r', self.cam.x, self.cam.y, self.cam.z, self.cam.screen.distance,
+            print '\r', self.cam.x, self.cam.y, self.cam.z, self.cam.screen.distance, self.rotate/math.pi, self.cam.theta/math.pi,
             
             self.clock.tick(50)
             self.screen.fill( self.background_color )
@@ -323,11 +343,12 @@ class Simulation:
 
 if __name__ == "__main__":
     try:
-        Simulation().run()
+        Simulation(win_width = 800, win_height = 600).run()
     except SystemExit:
         pass
     except:
         import time, traceback
+        print '\n\n'
         traceback.print_exc()
         time.sleep(10000)
 
