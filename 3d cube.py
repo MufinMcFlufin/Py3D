@@ -51,18 +51,30 @@ class Camera():
     def render(self, point_list):
         """ Returns 2d coordinates of applied perspective of point_list, 3rd coordinate of distance to camera for painterly algorithm. """
         # delta list is difference between x,y,z of points and camera
-        delta_l = [ (point.x - self.x, point.y - self.y, point.z - self.z) for point in point_list]
+        self.delta_l = [ (
+            point.x - self.x,
+            point.y - self.y,
+            point.z - self.z
+            ) for point in point_list]
         # next, determines difference in angle between point and camera, and distance to camera
-        theta_l = [ (math.atan(float(x)/math.sqrt( math.pow(y,2) + math.pow(z,2))), math.atan(float(y)/math.sqrt( math.pow(x,2) + math.pow(z,2))), math.sqrt( math.pow(x, 2) + math.pow(y, 2) + math.pow(z, 2))) for x, y, z in delta_l ]
+        self.theta_l = [ (
+            math.atan2( float(x), math.sqrt( math.pow(y, 2) + math.pow(z, 2) ) ),
+            math.atan2( float(y), math.sqrt( math.pow(x, 2) + math.pow(z, 2) ) ),
+            math.sqrt( math.pow(x, 2) + math.pow(y, 2) + math.pow(z, 2))
+            ) for x, y, z in self.delta_l ]
         # this is the angle from the camera's perspective that it would see the points, and distance to camera
-        perspective_l = [ (theta - self.theta, self.phi - phi, dist) for theta, phi, dist in theta_l ]
+        self.perspective_l = [ (
+            theta - self.theta,
+            self.phi - phi,
+            dist
+            ) for theta, phi, dist in self.theta_l ]
         # final calculations, to find the 2d coordinates of the perspective applied to the points, plus distance
-        screen_l = [ (
+        self.screen_l = [ (
             self.screen.win_width * self.screen.distance * math.tan( theta ) / self.screen.width + self.screen.win_width/2,
             self.screen.win_height * self.screen.distance * math.tan( phi ) / self.screen.height + self.screen.win_height/2,
             dist
-            ) for theta, phi, dist in perspective_l ]
-        return screen_l
+            ) for theta, phi, dist in self.perspective_l ]
+        return self.screen_l
 
 class Screen():
     """ Screen class mostly meant to hold onto specific variables that only apply to the virtual screen that exists only in the mathematics of the render method. """
@@ -214,11 +226,7 @@ class Point3D:
     def get_coords(self):
         return (self.x, self.y, self.z)
     
-    def get_coords2d(self):
-        return (self.x, self.y)
-    
     coords = property(get_coords)
-    coords2d = property(get_coords2d)
 
 class Simulation:
     """ Main engine of the program. """
@@ -242,7 +250,7 @@ class Simulation:
         self.background_color = dark_green
         
         self.rotate = 1.4*math.pi
-        self.rotate_inc = math.pi / 20
+        self.rotate_inc = math.pi / 80
         
         #self.cube = Cubie(0,0,0,{'top':'white', 'front':'green', 'right':'red', 'back':'blue', 'left':'orange', 'bottom':'yellow'})
         
@@ -261,6 +269,8 @@ class Simulation:
     def run(self):
         """ Main Loop """
         mult = .01
+        dist = 10
+        point_i = 0
         while 1:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -273,20 +283,22 @@ class Simulation:
                         self.draw_wires = not self.draw_wires
                     if event.key == pygame.K_3:
                         self.draw_points = not self.draw_points
+                    if event.key == pygame.K_7:
+                        dist += mult
                     if event.key == pygame.K_8:
                         self.rotate_inc *= -1
                     if event.key == pygame.K_9:
                         self.rotate -= self.rotate_inc
                         self.cam.x = 0
-                        self.cam.y = 10*math.cos( self.rotate )
-                        self.cam.z = 10*math.sin( self.rotate )
+                        self.cam.y = dist*math.cos( self.rotate )
+                        self.cam.z = dist*math.sin( self.rotate )
                         self.cam.theta = 0
                         self.cam.phi = 3*math.pi/2 - self.rotate
                     if event.key == pygame.K_0:
                         self.rotate -= self.rotate_inc
-                        self.cam.x = 10*math.cos( self.rotate )
+                        self.cam.x = dist*math.cos( self.rotate )
                         self.cam.y = 0
-                        self.cam.z = 10*math.sin( self.rotate )
+                        self.cam.z = dist*math.sin( self.rotate )
                         self.cam.theta = 3*math.pi/2 - self.rotate
                         self.cam.phi = 0
                     if event.key == pygame.K_w:
@@ -318,17 +330,23 @@ class Simulation:
                     if event.key == pygame.K_k:
                         self.cam.screen.distance -= mult
             
-            print '\r', self.cam.x, self.cam.y, self.cam.z, self.cam.screen.distance, self.rotate/math.pi, self.cam.theta/math.pi,
-            
             self.clock.tick(50)
             self.screen.fill( self.background_color )
             
-            # Calculate the average Z values of each face.
+            # Calculate the average Z values of each polygon.
             rendered_points = self.cam.render( self.poly.point_list )
-            average_z = [ (point_list, color, sum([ rendered_points[point][2] for point in point_list ])/len( point_list ) ) for point_list, color in self.poly.polygon_list ]
+            average_z = [ (
+                point_list,
+                color,
+                sum( [rendered_points[point][2] for point in point_list] ) / len( point_list )
+                ) for point_list, color in self.poly.polygon_list ]
+            
+            point_temp = self.poly.point_list[point_i]
+            
+            print '\r', (point_temp.x, point_temp.y, point_temp.z), (self.cam.x, self.cam.y, self.cam.z), self.cam.delta_l[point_i], self.cam.theta_l[point_i], self.cam.perspective_l[point_i], self.cam.screen_l[point_i]
             
             # Draw the faces using the Painterly algorithm:
-            # Distant faces are drawn before the closer ones, as determined by average Z axis distance from camera
+            # Distant faces are drawn before the closer ones, as determined by average distance of all points from camera
             for point_list, color, z_distance in sorted(average_z, key=itemgetter(2), reverse=True):
                 point_coords = [ ( rendered_points[point][0], rendered_points[point][1] ) for point in point_list ]
                 if self.draw_faces:
