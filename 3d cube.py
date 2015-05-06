@@ -186,7 +186,7 @@ class Polygons():
 
 class Point3D:
     """ Class dedicated to have a single object for each point to contain it's x,y,z information and allow for some basic easy rotations around axises. Will eventually add more, as needed. """
-    def __init__(self, x = 0, y = 0, z = 0):
+    def __init__(self, x, y, z):
         self.x, self.y, self.z = float(x), float(y), float(z)
     
     def rotateX(self, angle):
@@ -238,18 +238,18 @@ class Simulation:
         
         self.clock = pygame.time.Clock()
         
-        self.cam = Camera( -3, 0.0, -9.5, win_width = win_width, win_height = win_height )
-        self.cam.theta = 0.1 * math.pi
+        self.cam = Camera( -10.0, 0.0, 0.0, win_width = win_width, win_height = win_height )
+        self.cam.theta = 0.5 * math.pi
         
-        self.draw_points = False
-        self.draw_wires = False
-        self.draw_faces = True
+        self.draw_points = True
+        self.draw_wires = True
+        self.draw_faces = False
         
         self.point_color = green
         self.wire_color = white
         self.background_color = dark_green
         
-        self.rotate = 1.4*math.pi
+        self.rotate = 1.5*math.pi
         self.rotate_inc = math.pi / 80
         
         #self.cube = Cubie(0,0,0,{'top':'white', 'front':'green', 'right':'red', 'back':'blue', 'left':'orange', 'bottom':'yellow'})
@@ -296,10 +296,14 @@ class Simulation:
                         self.cam.phi = 3*math.pi/2 - self.rotate
                     if event.key == pygame.K_0:
                         self.rotate -= self.rotate_inc
-                        self.cam.x = dist*math.cos( self.rotate )
+                        # self.cam.x = dist*math.cos( self.rotate )
+                        # self.cam.y = 0
+                        # self.cam.z = dist*math.sin( self.rotate )
+                        self.cam.x = 0
                         self.cam.y = 0
-                        self.cam.z = dist*math.sin( self.rotate )
-                        self.cam.theta = 3*math.pi/2 - self.rotate
+                        self.cam.z = -10
+                        # self.cam.theta = 3*math.pi/2 - self.rotate
+                        self.cam.theta = 0
                         self.cam.phi = 0
                     if event.key == pygame.K_w:
                         self.cam.phi += mult
@@ -343,7 +347,13 @@ class Simulation:
             
             point_temp = self.poly.point_list[point_i]
             
-            print '\r', (point_temp.x, point_temp.y, point_temp.z), (self.cam.x, self.cam.y, self.cam.z), self.cam.delta_l[point_i], self.cam.theta_l[point_i], self.cam.perspective_l[point_i], self.cam.screen_l[point_i]
+            print 'Point: %s\nCam: %s\nDelta: %s\nTheta: %s\nPerspective: %s\nScreen: %s\n' % (
+                (point_temp.x, point_temp.y, point_temp.z),
+                (self.cam.x, self.cam.y, self.cam.z, self.cam.theta, self.cam.phi),
+                self.cam.delta_l[point_i],
+                self.cam.theta_l[point_i],
+                self.cam.perspective_l[point_i],
+                self.cam.screen_l[point_i])
             
             # Draw the faces using the Painterly algorithm:
             # Distant faces are drawn before the closer ones, as determined by average distance of all points from camera
@@ -357,6 +367,7 @@ class Simulation:
                     for x,y in point_coords:
                         self.screen.fill( self.point_color, (x, y, 2, 2))
             
+            self.screen.fill( red, ( rendered_points[point_i][0], rendered_points[point_i][1], 2, 2))
             pygame.display.flip()
 
 if __name__ == "__main__":
