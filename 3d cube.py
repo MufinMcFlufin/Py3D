@@ -58,8 +58,8 @@ class Camera():
             ) for point in point_list]
         # next, determines difference in angle between point and camera, and distance to camera
         self.theta_l = [ (
-            math.atan2( float(x), math.sqrt( math.pow(y, 2) + math.pow(z, 2) ) ),
-            math.atan2( float(y), math.sqrt( math.pow(x, 2) + math.pow(z, 2) ) ),
+            math.atan2( float(x), float(z) ),
+            math.atan2( float(y), float(z) ),
             math.sqrt( math.pow(x, 2) + math.pow(y, 2) + math.pow(z, 2))
             ) for x, y, z in self.delta_l ]
         # this is the angle from the camera's perspective that it would see the points, and distance to camera
@@ -185,43 +185,9 @@ class Polygons():
         return self.polygon_list [polygon_index] [1]
 
 class Point3D:
-    """ Class dedicated to have a single object for each point to contain it's x,y,z information and allow for some basic easy rotations around axises. Will eventually add more, as needed. """
+    """ Class dedicated to have a single object for each point to contain it's x,y,z information. Will eventually add more, as needed. """
     def __init__(self, x, y, z):
         self.x, self.y, self.z = float(x), float(y), float(z)
-    
-    def rotateX(self, angle):
-        """ Rotates the point around the X axis by the given angle in degrees. """
-        rad = angle * math.pi / 180
-        cosa = math.cos(rad)
-        sina = math.sin(rad)
-        y = self.y * cosa - self.z * sina
-        z = self.y * sina + self.z * cosa
-        return Point3D(self.x, y, z)
-    
-    def rotateY(self, angle):
-        """ Rotates the point around the Y axis by the given angle in degrees. """
-        rad = angle * math.pi / 180
-        cosa = math.cos(rad)
-        sina = math.sin(rad)
-        z = self.z * cosa - self.x * sina
-        x = self.z * sina + self.x * cosa
-        return Point3D(x, self.y, z)
-    
-    def rotateZ(self, angle):
-        """ Rotates the point around the Z axis by the given angle in degrees. """
-        rad = angle * math.pi / 180
-        cosa = math.cos(rad)
-        sina = math.sin(rad)
-        x = self.x * cosa - self.y * sina
-        y = self.x * sina + self.y * cosa
-        return Point3D(x, y, self.z)
-    
-    def project(self, win_width, win_height, fov, viewer_distance):
-        """ Transforms this 3D point to 2D using a perspective projection. """
-        factor = fov / (viewer_distance + self.z)
-        x = self.x * factor + win_width / 2
-        y = -self.y * factor + win_height / 2
-        return Point3D(x, y, self.z)
     
     def get_coords(self):
         return (self.x, self.y, self.z)
@@ -238,8 +204,7 @@ class Simulation:
         
         self.clock = pygame.time.Clock()
         
-        self.cam = Camera( -10.0, 0.0, 0.0, win_width = win_width, win_height = win_height )
-        self.cam.theta = 0.5 * math.pi
+        self.cam = Camera( 0.0, 0.0, -10.0, win_width = win_width, win_height = win_height )
         
         self.draw_points = True
         self.draw_wires = True
@@ -248,9 +213,6 @@ class Simulation:
         self.point_color = green
         self.wire_color = white
         self.background_color = dark_green
-        
-        self.rotate = 1.5*math.pi
-        self.rotate_inc = math.pi / 80
         
         #self.cube = Cubie(0,0,0,{'top':'white', 'front':'green', 'right':'red', 'back':'blue', 'left':'orange', 'bottom':'yellow'})
         
@@ -268,8 +230,6 @@ class Simulation:
     
     def run(self):
         """ Main Loop """
-        mult = .01
-        dist = 10
         point_i = 0
         while 1:
             for event in pygame.event.get():
@@ -283,56 +243,12 @@ class Simulation:
                         self.draw_wires = not self.draw_wires
                     if event.key == pygame.K_3:
                         self.draw_points = not self.draw_points
-                    if event.key == pygame.K_7:
-                        dist += mult
-                    if event.key == pygame.K_8:
-                        self.rotate_inc *= -1
-                    if event.key == pygame.K_9:
-                        self.rotate -= self.rotate_inc
-                        self.cam.x = 0
-                        self.cam.y = dist*math.cos( self.rotate )
-                        self.cam.z = dist*math.sin( self.rotate )
-                        self.cam.theta = 0
-                        self.cam.phi = 3*math.pi/2 - self.rotate
-                    if event.key == pygame.K_0:
-                        self.rotate -= self.rotate_inc
-                        # self.cam.x = dist*math.cos( self.rotate )
-                        # self.cam.y = 0
-                        # self.cam.z = dist*math.sin( self.rotate )
-                        self.cam.x = 0
-                        self.cam.y = 0
-                        self.cam.z = -10
-                        # self.cam.theta = 3*math.pi/2 - self.rotate
-                        self.cam.theta = 0
-                        self.cam.phi = 0
-                    if event.key == pygame.K_w:
-                        self.cam.phi += mult
-                    if event.key == pygame.K_a:
-                        self.cam.theta -= mult
-                    if event.key == pygame.K_s:
-                        self.cam.phi -= mult
-                    if event.key == pygame.K_d:
-                        self.cam.theta += mult
-                    if event.key == pygame.K_KP4:
-                        self.cam.x += mult
-                    if event.key == pygame.K_KP1:
-                        self.cam.x -= mult
-                    if event.key == pygame.K_KP5:
-                        self.cam.y += mult
-                    if event.key == pygame.K_KP2:
-                        self.cam.y -= mult
-                    if event.key == pygame.K_KP6:
-                        self.cam.z += mult
-                    if event.key == pygame.K_KP3:
-                        self.cam.z -= mult
-                    if event.key == pygame.K_KP7:
-                        mult *= 10
-                    if event.key == pygame.K_KP9:
-                        mult /= 10
-                    if event.key == pygame.K_i:
-                        self.cam.screen.distance += mult
-                    if event.key == pygame.K_k:
-                        self.cam.screen.distance -= mult
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pass
+                if event.type == pygame.MOUSEBUTTONUP:
+                    pass
+                if event.type == pygame.MOUSEMOTION:
+                    pass
             
             self.clock.tick(50)
             self.screen.fill( self.background_color )
@@ -347,13 +263,13 @@ class Simulation:
             
             point_temp = self.poly.point_list[point_i]
             
-            print 'Point: %s\nCam: %s\nDelta: %s\nTheta: %s\nPerspective: %s\nScreen: %s\n' % (
-                (point_temp.x, point_temp.y, point_temp.z),
-                (self.cam.x, self.cam.y, self.cam.z, self.cam.theta, self.cam.phi),
-                self.cam.delta_l[point_i],
-                self.cam.theta_l[point_i],
-                self.cam.perspective_l[point_i],
-                self.cam.screen_l[point_i])
+            # print 'Point: %s\nCam: %s\nDelta: %s\nTheta: %s\nPerspective: %s\nScreen: %s\n' % (
+            #     (point_temp.x, point_temp.y, point_temp.z),
+            #     (self.cam.x, self.cam.y, self.cam.z, self.cam.theta, self.cam.phi),
+            #     self.cam.delta_l[point_i],
+            #     self.cam.theta_l[point_i],
+            #     self.cam.perspective_l[point_i],
+            #     self.cam.screen_l[point_i])
             
             # Draw the faces using the Painterly algorithm:
             # Distant faces are drawn before the closer ones, as determined by average distance of all points from camera
