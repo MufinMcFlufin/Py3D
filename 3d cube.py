@@ -22,7 +22,7 @@ yellow = (255, 255, 0)
 black = (0, 0, 0)
 dark_green = (0, 32, 0)
 
-color_ref = {
+master_color_ref = {
 (255, 255, 255): 'white',
 (0, 255, 0): 'green',
 (255, 0, 0): 'red',
@@ -140,9 +140,18 @@ class Cubie():
                         for z in range(-1,2,2):
                             self.polygons.add_point( Point3D( -cubie_size/2 - 0.01, y*sticker_size/2, z*sticker_size/2 ))
                 points = len( self.polygons.point_list )
-                self.polygons.add_polygon( (points - 4, points - 3, points - 1, points - 2), color_ref [color] )
+                self.polygons.add_polygon( (points - 4, points - 3, points - 1, points - 2), master_color_ref [color] )
             except KeyError:
                 pass
+    
+    def rotate_x(self, rotate):
+        return rotate_point_list( self.polygons.point_list, rotate )
+    
+    def rotate_y(self, rotate):
+        return rotate_point_list( self.polygons.point_list, rotate )
+    
+    def rotate_z(self, rotate):
+        return rotate_point_list( self.polygons.point_list, rotate )
 
 class Polygons():
     """ Class dedicated to holding onto all information for all polygons. Stores information for actual polygons, points, colors, and management for everything between. """
@@ -189,10 +198,40 @@ class Point3D:
     def __init__(self, x, y, z):
         self.x, self.y, self.z = float(x), float(y), float(z)
     
+    def rotate_x(self, angle):
+        """ Rotates the point around the X axis by the given angle in degrees. """
+        rad = angle * math.pi / 180
+        cosa = math.cos(rad)
+        sina = math.sin(rad)
+        y = self.y * cosa - self.z * sina
+        z = self.y * sina + self.z * cosa
+        return Point3D(self.x, y, z)
+    
+    def rotate_y(self, angle):
+        """ Rotates the point around the Y axis by the given angle in degrees. """
+        rad = angle * math.pi / 180
+        cosa = math.cos(rad)
+        sina = math.sin(rad)
+        z = self.z * cosa - self.x * sina
+        x = self.z * sina + self.x * cosa
+        return Point3D(x, self.y, z)
+    
+    def rotate_z(self, angle):
+        """ Rotates the point around the Z axis by the given angle in degrees. """
+        rad = angle * math.pi / 180
+        cosa = math.cos(rad)
+        sina = math.sin(rad)
+        x = self.x * cosa - self.y * sina
+        y = self.x * sina + self.y * cosa
+        return Point3D(x, y, self.z)
+    
     def get_coords(self):
         return (self.x, self.y, self.z)
     
     coords = property(get_coords)
+
+def rotate_point_list( point_list, rotate_x=0, rotate_y=0, rotate_z=0 ):
+    return [ point.rotate_x( rotate_x ).rotate_y( rotate_y ).rotate_z( rotate_z ) for point in point_list ]
 
 class Simulation:
     """ Main engine of the program. """
@@ -205,6 +244,8 @@ class Simulation:
         self.clock = pygame.time.Clock()
         
         self.cam = Camera( 0.0, 0.0, -10.0, win_width = win_width, win_height = win_height )
+        
+        self.rotate_x, self.rotate_y = 0, 0
         
         self.draw_points = True
         self.draw_wires = True
@@ -231,6 +272,7 @@ class Simulation:
     def run(self):
         """ Main Loop """
         point_i = 0
+        d_y, d_x = 0, 0
         while 1:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -244,17 +286,35 @@ class Simulation:
                     if event.key == pygame.K_3:
                         self.draw_points = not self.draw_points
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    pass
+                    if event.button == 3:
+                        d_y, d_x = 0, 0
+                        self.poly.point_list = rotate_point_list(
+                            self.poly.point_list,
+                            self.rotate_x,
+                            self.rotate_y )
+                        self.rotate_x, self.rotate_y = 0, 0
                 if event.type == pygame.MOUSEBUTTONUP:
-                    pass
+                    if event.button == 3:
+                        self.poly.point_list = rotate_point_list(
+                            self.poly.point_list,
+                            self.rotate_x,
+                            self.rotate_y )
+                        self.rotate_x, self.rotate_y = 0, 0
                 if event.type == pygame.MOUSEMOTION:
-                    pass
+                    if event.buttons == (0,0,1):
+                        d_y, d_x = event.rel
+            
+            self.rotate_x -= d_x / 2.0
+            self.rotate_y -= d_y / 2.0
             
             self.clock.tick(50)
             self.screen.fill( self.background_color )
             
+            d_y *= 0.9
+            d_x *= 0.9
+            
             # Calculate the average Z values of each polygon.
-            rendered_points = self.cam.render( self.poly.point_list )
+            rendered_points = self.cam.render( rotate_point_list( self.poly.point_list, self.rotate_x, self.rotate_y ) )
             average_z = [ (
                 point_list,
                 color,
